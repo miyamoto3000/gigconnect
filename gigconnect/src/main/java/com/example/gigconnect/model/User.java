@@ -6,6 +6,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
+import java.util.List;
+
 @Data
 @Document(collection = "users")
 public class User {
@@ -26,4 +28,13 @@ public class User {
     private String[] skills; // For gig workers
     private PortfolioEntry[] portfolio; // Previous work
     private String[] mediaUrls; // Image URLs
+    private List<Review> reviews; // List of reviews and ratings
+
+    @Data
+    public static class Review {
+        private String clientId;
+        private String clientName;
+        private String comment;
+        private int rating; // 1 to 5
+    }
 }
