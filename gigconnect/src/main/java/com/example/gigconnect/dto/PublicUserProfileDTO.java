@@ -18,12 +18,13 @@ public class PublicUserProfileDTO {
     private double averageRating;
     private List<ReviewDTO> reviews;
     private List<GigService> services;
-
+    private boolean openToWork;
     @Data
     public static class ReviewDTO {
         private String comment;
         private int rating;
         private String clientId;
         private String clientName;
+        private String serviceId;
     }
 }

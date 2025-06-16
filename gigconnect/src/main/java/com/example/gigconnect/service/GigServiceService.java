@@ -57,5 +57,13 @@ public class GigServiceService {
             throw new RuntimeException("Not authorized to delete this service");
         }
         gigServiceRepository.delete(service);
+    } 
+    // GigServiceService.java
+public List<GigService> getMyServices(String email) {
+    User user = userRepository.findByEmail(email);
+    if (user == null || !user.getRole().equals("GIG_WORKER")) {
+        throw new RuntimeException("Only GIG_WORKERs can view their services");
     }
+    return gigServiceRepository.findByUserId(user.getId());
+}
 }

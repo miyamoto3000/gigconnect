@@ -12,4 +12,5 @@ public class UserProfileUpdateDTO {
     private String[] skills;
     private PortfolioEntry[] portfolio;
     private String[] mediaUrls;
+    private Boolean openToWork;
 }

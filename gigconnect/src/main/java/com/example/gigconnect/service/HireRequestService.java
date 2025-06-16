@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class HireRequestService {
@@ -73,6 +74,12 @@ public class HireRequestService {
             throw new RuntimeException("Invalid date format. Use ISO 8601 format (e.g., 2025-06-20T15:00:00)");
         }
 
+        // Validate budget
+        if (hireRequest.getBudget() <= 0) {
+            logger.error("Budget must be a positive value: {}", hireRequest.getBudget());
+            throw new RuntimeException("Budget must be a positive value");
+        }
+
         hireRequest.setClientId(client.getId());
         hireRequest.setGigWorkerId(gigWorker.getId());
         hireRequest.setStatus("PENDING");
@@ -107,6 +114,7 @@ public class HireRequestService {
         }
 
         hireRequest.setStatus("ACCEPTED");
+        hireRequest.setWorkStatus("IN_PROGRESS"); // Initialize workStatus
         HireRequest updatedRequest = hireRequestRepository.save(hireRequest);
         logger.debug("Hire request accepted: {}", updatedRequest);
         return updatedRequest;
@@ -142,6 +150,41 @@ public class HireRequestService {
         return updatedRequest;
     }
 
+    public HireRequest updateWorkStatus(String hireRequestId, String workStatus, String gigWorkerEmail) {
+        logger.debug("Updating work status for hire request {} by gig worker email: {}", hireRequestId, gigWorkerEmail);
+        HireRequest hireRequest = hireRequestRepository.findById(hireRequestId)
+                .orElseThrow(() -> {
+                    logger.error("Hire request not found: {}", hireRequestId);
+                    return new RuntimeException("Hire request not found");
+                });
+
+        User gigWorker = userRepository.findByEmail(gigWorkerEmail);
+        if (gigWorker == null || !gigWorker.getRole().equals("GIG_WORKER")) {
+            logger.error("User not found or not a GIG_WORKER: {}", gigWorkerEmail);
+            throw new RuntimeException("Only GIG_WORKERs can update work status");
+        }
+
+        if (!hireRequest.getGigWorkerId().equals(gigWorker.getId())) {
+            logger.error("Gig Worker not authorized to update this hire request: {}", gigWorkerEmail);
+            throw new RuntimeException("Not authorized to update this hire request");
+        }
+
+        if (!hireRequest.getStatus().equals("ACCEPTED")) {
+            logger.error("Hire request must be in ACCEPTED state to update work status: {}", hireRequest.getStatus());
+            throw new RuntimeException("Hire request must be in ACCEPTED state to update work status");
+        }
+
+        if (!workStatus.equals("IN_PROGRESS") && !workStatus.equals("COMPLETED")) {
+            logger.error("Invalid work status: {}. Must be IN_PROGRESS or COMPLETED", workStatus);
+            throw new RuntimeException("Invalid work status. Must be IN_PROGRESS or COMPLETED");
+        }
+
+        hireRequest.setWorkStatus(workStatus);
+        HireRequest updatedRequest = hireRequestRepository.save(hireRequest);
+        logger.debug("Work status updated: {}", updatedRequest);
+        return updatedRequest;
+    }
+
     public HireRequest completeHireRequest(String hireRequestId, String gigWorkerEmail) {
         logger.debug("Completing hire request {} by gig worker email: {}", hireRequestId, gigWorkerEmail);
         HireRequest hireRequest = hireRequestRepository.findById(hireRequestId)
@@ -166,7 +209,7 @@ public class HireRequestService {
             throw new RuntimeException("Hire request must be in ACCEPTED state to complete");
         }
 
-        hireRequest.setStatus("COMPLETED");
+        hireRequest.setWorkStatus("COMPLETED"); // Update workStatus instead of status
         HireRequest updatedRequest = hireRequestRepository.save(hireRequest);
         logger.debug("Hire request completed: {}", updatedRequest);
         return updatedRequest;
@@ -195,4 +238,23 @@ public class HireRequestService {
         logger.debug("Found {} hire requests for client: {}", requests.size(), clientEmail);
         return requests;
     }
+
+    // HireRequestService.java
+public List<HireRequest> getAcceptedHireRequests(String email) {
+    logger.debug("Fetching accepted hire requests for user email: {}", email);
+    User user = userRepository.findByEmail(email);
+    if (user == null) {
+        throw new RuntimeException("User not found");
+    }
+    if (user.getRole().equals("GIG_WORKER")) {
+        return hireRequestRepository.findByGigWorkerIdAndStatus(user.getId(), "ACCEPTED");
+    } else if (user.getRole().equals("CLIENT")) {
+        return hireRequestRepository.findByClientId(user.getId()).stream()
+                .filter(req -> req.getStatus().equals("ACCEPTED"))
+                .collect(Collectors.toList());
+    } else {
+        throw new RuntimeException("Only CLIENTs and GIG_WORKERs can view accepted hire requests");
+    }
+}
+    
 }

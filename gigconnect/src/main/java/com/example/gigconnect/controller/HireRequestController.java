@@ -76,4 +76,36 @@ public class HireRequestController {
         logger.debug("Returning {} hire requests for client", requests.size());
         return ResponseEntity.ok(requests);
     }
+    // HireRequestController.java
+@PostMapping("/{id}/update-status")
+public ResponseEntity<HireRequest> updateWorkStatus(
+        @PathVariable String id,
+        @RequestBody WorkStatusRequest workStatusRequest,
+        Authentication authentication) {
+    logger.debug("Received request to update work status for hire request {} by user: {}", id, authentication.getName());
+    HireRequest updatedRequest = hireRequestService.updateWorkStatus(id, workStatusRequest.getWorkStatus(), authentication.getName());
+    logger.debug("Work status updated: {}", updatedRequest);
+    return ResponseEntity.ok(updatedRequest);
+} 
+// HireRequestController.java
+@GetMapping("/accepted")
+public ResponseEntity<List<HireRequest>> getAcceptedHireRequests(Authentication authentication) {
+    logger.debug("Received request to fetch accepted hire requests for user: {}", authentication.getName());
+    List<HireRequest> requests = hireRequestService.getAcceptedHireRequests(authentication.getName());
+    logger.debug("Returning {} accepted hire requests", requests.size());
+    return ResponseEntity.ok(requests);
+}
+
+} 
+// HireRequestController.java (add at the bottom)
+class WorkStatusRequest {
+    private String workStatus;
+
+    public String getWorkStatus() {
+        return workStatus;
+    }
+
+    public void setWorkStatus(String workStatus) {
+        this.workStatus = workStatus;
+    }
 }

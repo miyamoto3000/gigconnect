@@ -29,12 +29,13 @@ public class User {
     private PortfolioEntry[] portfolio; // Previous work
     private String[] mediaUrls; // Image URLs
     private List<Review> reviews; // List of reviews and ratings
-
+private boolean openToWork; // New field
     @Data
     public static class Review {
         private String clientId;
         private String clientName;
         private String comment;
         private int rating; // 1 to 5
+        private String serviceId; // New field
     }
 }

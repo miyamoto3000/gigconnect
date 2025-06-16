@@ -5,12 +5,14 @@ import com.example.gigconnect.dto.UserProfileUpdateDTO;
 import com.example.gigconnect.model.User;
 import com.example.gigconnect.service.UserService;
 import jakarta.validation.Valid;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.*; 
+import org.springframework.security.core.Authentication; // Correct import
 
 @RestController
 @RequestMapping("/api/users")
@@ -52,7 +54,15 @@ public class UserController {
         PublicUserProfileDTO profile = userService.getPublicProfile(id);
         logger.debug("Public profile retrieved for userId: {}", id);
         return ResponseEntity.ok(profile);
-    }
+    } 
+    // UserController.java
+@GetMapping("/me")
+public ResponseEntity<User> getCurrentUser(Authentication authentication) {
+    logger.debug("Received request to fetch current user: {}", authentication.getName());
+    User user = userService.getUserByEmail(authentication.getName());
+    logger.debug("Current user retrieved: {}", user.getEmail());
+    return ResponseEntity.ok(user);
+}
 }
 
 class LoginRequest {

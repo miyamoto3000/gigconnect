@@ -18,26 +18,28 @@ public class ReviewController {
     @Autowired
     private ReviewService reviewService;
 
-    @PostMapping("/{gigWorkerId}")
-    public ResponseEntity<User> addReview(
-            @PathVariable String gigWorkerId,
-            @RequestBody ReviewRequest reviewRequest,
-            Authentication authentication) {
-        logger.debug("Received request to add review for gig worker ID: {} by user: {}", gigWorkerId, authentication.getName());
-        User updatedGigWorker = reviewService.addReview(
-                gigWorkerId,
-                authentication.getName(),
-                reviewRequest.getComment(),
-                reviewRequest.getRating()
-        );
-        logger.debug("Review added for gig worker ID: {}", gigWorkerId);
-        return ResponseEntity.ok(updatedGigWorker);
-    }
+  // ReviewController.java
+@PostMapping("/{gigWorkerId}")
+public ResponseEntity<User> addReview(
+        @PathVariable String gigWorkerId,
+        @RequestBody ReviewRequest reviewRequest,
+        Authentication authentication) {
+    logger.debug("Received request to add review for gig worker ID: {} by user: {}", gigWorkerId, authentication.getName());
+    User updatedGigWorker = reviewService.addReview(
+            gigWorkerId,
+            authentication.getName(),
+            reviewRequest.getComment(),
+            reviewRequest.getRating(),
+            reviewRequest.getServiceId()
+    );
+    logger.debug("Review added for gig worker ID: {}", gigWorkerId);
+    return ResponseEntity.ok(updatedGigWorker);
 }
 
 class ReviewRequest {
     private String comment;
     private int rating;
+    private String serviceId; // New field
 
     public String getComment() {
         return comment;
@@ -54,4 +56,13 @@ class ReviewRequest {
     public void setRating(int rating) {
         this.rating = rating;
     }
+
+    public String getServiceId() {
+        return serviceId;
+    }
+
+    public void setServiceId(String serviceId) {
+        this.serviceId = serviceId;
+    }
+}
 }

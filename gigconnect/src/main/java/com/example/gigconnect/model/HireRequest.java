@@ -4,22 +4,27 @@ import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 
+// HireRequest.java
 @Data
 @Document(collection = "hire_requests")
 public class HireRequest {
     @Id
     private String id;
     @NotBlank(message = "Service ID is required")
-    private String serviceId; // The GigService being hired for
-    private String gigWorkerId; // The GIG_WORKER providing the service
-    private String clientId; // The CLIENT making the request
-    private String message; // Optional message from the CLIENT
-    private String status; // PENDING, ACCEPTED, REJECTED, COMPLETED
-    private String createdAt; // Timestamp of creation
-     private String requestedDateTime; 
+    private String serviceId;
+    private String gigWorkerId;
+    private String clientId;
+    private String message;
+    private String status; // PENDING, ACCEPTED, REJECTED
+    private String workStatus; // IN_PROGRESS, COMPLETED (for accepted requests)
+    private String createdAt;
+    private String requestedDateTime;
+    @Positive(message = "Budget must be positive")
+    private double budget;
 
-      @Override
+    @Override
     public String toString() {
         return "HireRequest{" +
                 "id='" + id + '\'' +
@@ -28,8 +33,10 @@ public class HireRequest {
                 ", clientId='" + clientId + '\'' +
                 ", message='" + message + '\'' +
                 ", status='" + status + '\'' +
+                ", workStatus='" + workStatus + '\'' +
                 ", createdAt='" + createdAt + '\'' +
                 ", requestedDateTime='" + requestedDateTime + '\'' +
+                ", budget=" + budget +
                 '}';
     }
 }

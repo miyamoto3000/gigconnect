@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -82,7 +83,8 @@ public class UserService {
         if (existingUser == null) {
             logger.error("User not found with email: {}", email);
             throw new RuntimeException("User not found");
-        }
+        } 
+        if (updatedUser.getOpenToWork() != null) existingUser.setOpenToWork(updatedUser.getOpenToWork());
         if (updatedUser.getName() != null) existingUser.setName(updatedUser.getName());
         if (updatedUser.getCity() != null) existingUser.setCity(updatedUser.getCity());
         if (updatedUser.getState() != null) existingUser.setState(updatedUser.getState());
@@ -113,7 +115,8 @@ public class UserService {
             throw new RuntimeException("Only GIG_WORKER profiles are publicly viewable");
         }
         PublicUserProfileDTO profile = new PublicUserProfileDTO();
-        profile.setId(user.getId());
+        profile.setId(user.getId()); 
+        profile.setOpenToWork(user.isOpenToWork());
         profile.setName(user.getName());
         profile.setCity(user.getCity());
         profile.setState(user.getState());
@@ -150,5 +153,44 @@ public class UserService {
 
         logger.debug("Public profile retrieved for userId: {}", userId);
         return profile;
+    } 
+    // UserService.java
+public User getUserByEmail(String email) {
+    logger.debug("Fetching user by email: {}", email);
+    User user = userRepository.findByEmail(email);
+    if (user == null) {
+        logger.error("User not found with email: {}", email);
+        throw new RuntimeException("User not found");
     }
+    return user;
+} 
+// UserService.java
+public List<PublicUserProfileDTO> searchGigWorkers(String keyword, String city, String state) {
+    logger.debug("Searching gig workers with keyword: {}, city: {}, state: {}", keyword, city, state);
+    
+    // First, find users matching city and state (if provided)
+    List<User> gigWorkers = userRepository.findAll().stream()
+            .filter(user -> user.getRole().equals("GIG_WORKER"))
+            .filter(user -> city == null || user.getCity() != null && user.getCity().equalsIgnoreCase(city))
+            .filter(user -> state == null || user.getState() != null && user.getState().equalsIgnoreCase(state))
+            .collect(Collectors.toList());
+    
+    List<String> gigWorkerIds = gigWorkers.stream().map(User::getId).collect(Collectors.toList());
+    
+    // Find services matching the keyword for these gig workers
+    List<GigService> matchingServices = gigServiceRepository.findByUserIdsAndTitleOrCategory(gigWorkerIds, keyword);
+    
+    // Get unique gig worker IDs from matching services
+    Set<String> matchingGigWorkerIds = matchingServices.stream()
+            .map(GigService::getUserId)
+            .collect(Collectors.toSet());
+    
+    // Convert to PublicUserProfileDTO
+    List<PublicUserProfileDTO> profiles = matchingGigWorkerIds.stream()
+            .map(this::getPublicProfile)
+            .collect(Collectors.toList());
+    
+    logger.debug("Found {} gig workers matching search criteria", profiles.size());
+    return profiles;
+}
 }
