@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ReviewService {
@@ -77,5 +78,16 @@ public User addReview(String gigWorkerId, String clientEmail, String comment, in
     User updatedGigWorker = userRepository.save(gigWorker);
     logger.debug("Review added for gig worker ID: {}", gigWorkerId);
     return updatedGigWorker;
+} 
+public List<User.Review> getReviewsByService(String serviceId, String gigWorkerEmail) {
+    logger.debug("Fetching reviews for service: {} by gig worker email: {}", serviceId, gigWorkerEmail);
+    User gigWorker = userRepository.findByEmail(gigWorkerEmail);
+    if (gigWorker == null || !gigWorker.getRole().equals("GIG_WORKER")) {
+        logger.error("User not found or not a GIG_WORKER: {}", gigWorkerEmail);
+        throw new RuntimeException("Only GIG_WORKERs can view service reviews");
+    }
+    return gigWorker.getReviews().stream()
+            .filter(review -> review.getServiceId().equals(serviceId))
+            .collect(Collectors.toList());
 }
 }

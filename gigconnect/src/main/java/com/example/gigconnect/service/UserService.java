@@ -103,57 +103,53 @@ public class UserService {
         return updated;
     }
 
-    public PublicUserProfileDTO getPublicProfile(String userId) {
-        logger.debug("Fetching public profile for userId: {}", userId);
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> {
-                    logger.error("User not found with id: {}", userId);
-                    return new RuntimeException("User not found");
-                });
-        if (!user.getRole().equals("GIG_WORKER")) {
-            logger.error("User is not a GIG_WORKER: {}", userId);
-            throw new RuntimeException("Only GIG_WORKER profiles are publicly viewable");
-        }
-        PublicUserProfileDTO profile = new PublicUserProfileDTO();
-        profile.setId(user.getId()); 
-        profile.setOpenToWork(user.isOpenToWork());
-        profile.setName(user.getName());
-        profile.setCity(user.getCity());
-        profile.setState(user.getState());
-        profile.setSkills(user.getSkills());
-        profile.setPortfolio(user.getPortfolio());
-        profile.setMediaUrls(user.getMediaUrls());
+  public PublicUserProfileDTO getPublicProfile(String userId) {
+    logger.debug("Fetching public profile for userId: {}", userId);
+    User user = userRepository.findById(userId)
+            .orElseThrow(() -> {
+                logger.error("User not found with id: {}", userId);
+                return new RuntimeException("User not found");
+            });
+    if (!user.getRole().equals("GIG_WORKER")) {
+        logger.warn("Profile requested for non-GIG_WORKER user: {}", userId);
+        return null; // Or throw a custom exception if you want to restrict non-gig workers
+    }
+    PublicUserProfileDTO profile = new PublicUserProfileDTO();
+    profile.setId(user.getId());
+    profile.setOpenToWork(user.isOpenToWork());
+    profile.setName(user.getName());
+    profile.setCity(user.getCity());
+    profile.setState(user.getState());
+    profile.setSkills(user.getSkills());
+    profile.setPortfolio(user.getPortfolio());
+    profile.setMediaUrls(user.getMediaUrls());
 
-        // Fetch services
-        List<GigService> services = gigServiceRepository.findByUserId(userId);
-        profile.setServices(services);
+    List<GigService> services = gigServiceRepository.findByUserId(userId);
+    profile.setServices(services);
 
-        // Calculate average rating and set reviews
-        List<User.Review> reviews = user.getReviews();
-        if (reviews != null && !reviews.isEmpty()) {
-            double averageRating = reviews.stream()
-                    .mapToInt(User.Review::getRating)
-                    .average()
-                    .orElse(0.0);
-            profile.setAverageRating(averageRating);
+    List<User.Review> reviews = user.getReviews();
+    if (reviews != null && !reviews.isEmpty()) {
+        double averageRating = reviews.stream()
+                .mapToInt(User.Review::getRating)
+                .average()
+                .orElse(0.0);
+        profile.setAverageRating(averageRating);
+        profile.setReviews(reviews.stream().map(review -> {
+            PublicUserProfileDTO.ReviewDTO dto = new PublicUserProfileDTO.ReviewDTO();
+            dto.setComment(review.getComment());
+            dto.setRating(review.getRating());
+            dto.setClientId(review.getClientId());
+            dto.setClientName(review.getClientName());
+            return dto;
+        }).collect(Collectors.toList()));
+    } else {
+        profile.setAverageRating(0.0);
+        profile.setReviews(null);
+    }
 
-            List<PublicUserProfileDTO.ReviewDTO> reviewDTOs = reviews.stream().map(review -> {
-                PublicUserProfileDTO.ReviewDTO dto = new PublicUserProfileDTO.ReviewDTO();
-                dto.setComment(review.getComment());
-                dto.setRating(review.getRating());
-                dto.setClientId(review.getClientId());
-                dto.setClientName(review.getClientName());
-                return dto;
-            }).collect(Collectors.toList());
-            profile.setReviews(reviewDTOs);
-        } else {
-            profile.setAverageRating(0.0);
-            profile.setReviews(null);
-        }
-
-        logger.debug("Public profile retrieved for userId: {}", userId);
-        return profile;
-    } 
+    logger.debug("Public profile retrieved for userId: {}", userId);
+    return profile;
+}
     // UserService.java
 public User getUserByEmail(String email) {
     logger.debug("Fetching user by email: {}", email);

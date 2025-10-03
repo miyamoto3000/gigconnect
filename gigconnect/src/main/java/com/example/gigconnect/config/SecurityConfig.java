@@ -37,8 +37,11 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/users/register", "/api/users/login").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/services", "/api/services/**").permitAll()
-            .requestMatchers(HttpMethod.GET, "/api/users/*/profile").hasRole("CLIENT")
-            .requestMatchers(HttpMethod.GET, "/api/search").hasRole("CLIENT")
+            .requestMatchers(HttpMethod.GET, "/api/users/*/profile").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/services/search").permitAll()
+            .requestMatchers("/api/hire-requests/**").authenticated()
+            .requestMatchers("/api/reviews/**").authenticated()
+            .requestMatchers("/api/users/profile").authenticated()
             .anyRequest().authenticated()
         )
         .exceptionHandling(ex -> ex
