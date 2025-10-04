@@ -95,6 +95,7 @@ public class GigServiceController {
             @RequestParam String keyword,
             @RequestParam(required = false) String city,
             @RequestParam(required = false) String state,
+            @RequestParam(required = false) List<String> skills,
             Authentication authentication) {
         logger.debug("Searching services with keyword: {}, city: {}, state: {}", keyword, city, state);
         try {
