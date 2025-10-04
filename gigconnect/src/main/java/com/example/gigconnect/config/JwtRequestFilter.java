@@ -10,7 +10,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -40,19 +39,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         String email = null;
         String jwt = null;
 
-        // Log the request path and method for debugging
-        String path = request.getRequestURI();
-        String method = request.getMethod();
-        logger.debug("Processing request: {} {}", method, path);
+        logger.debug("Processing request: {} {}", request.getMethod(), request.getRequestURI());
 
-        // Skip filter for public endpoints
-        if (isPublicEndpoint(path, method)) {
-            logger.debug("Skipping authentication for public endpoint: {} {}", method, path);
-            chain.doFilter(request, response);
-            return;
-        }
-
-        // Extract JWT token from Authorization header
+        // Extract JWT token from Authorization header if it exists
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
             jwt = authorizationHeader.substring(7);
             try {
@@ -60,64 +49,29 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 logger.debug("Extracted email from JWT: {}", email);
             } catch (ExpiredJwtException e) {
                 logger.warn("JWT Token has expired: {}", e.getMessage());
-                response.setStatus(HttpStatus.UNAUTHORIZED.value());
-                response.setContentType("application/json");
-                response.getWriter().write("{\"error\": \"Token expired\"}");
-                return;
-            } catch (MalformedJwtException | SignatureException e) {
+                // Let the request continue. If the endpoint is protected, Spring Security will catch it.
+            } catch (MalformedJwtException | SignatureException | IllegalArgumentException e) {
                 logger.warn("Invalid JWT Token: {}", e.getMessage());
-                response.setStatus(HttpStatus.UNAUTHORIZED.value());
-                response.setContentType("application/json");
-                response.getWriter().write("{\"error\": \"Invalid token\"}");
-                return;
-            } catch (IllegalArgumentException e) {
-                logger.warn("Unable to get JWT Token: {}", e.getMessage());
-                response.setStatus(HttpStatus.UNAUTHORIZED.value());
-                response.setContentType("application/json");
-                response.getWriter().write("{\"error\": \"Invalid token format\"}");
-                return;
+                // Let the request continue.
             }
-        } else {
-            logger.debug("No Bearer token found in Authorization header for path: {}", path);
-            response.setStatus(HttpStatus.UNAUTHORIZED.value());
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\": \"Missing token\"}");
-            return;
         }
 
-        // Validate token and set authentication
+        // If we have a valid email from the token and no one is currently authenticated,
+        // authenticate the user.
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = this.userDetailsService.loadUserByUsername(email);
+
+            // If the token is valid, configure Spring Security to manually set the authentication
             if (jwtUtil.validateToken(jwt)) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                logger.debug("Loaded user details for email: {}", email);
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
                 logger.debug("Set authentication for user: {}", email);
-            } else {
-                logger.warn("JWT token validation failed for email: {}", email);
-                response.setStatus(HttpStatus.UNAUTHORIZED.value());
-                response.setContentType("application/json");
-                response.getWriter().write("{\"error\": \"Token validation failed\"}");
-                return;
             }
-        } else if (email == null) {
-            logger.debug("No email extracted from token for path: {}", path);
-            response.setStatus(HttpStatus.UNAUTHORIZED.value());
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\": \"Unable to extract email from token\"}");
-            return;
         }
 
+        // Continue the filter chain for the request to proceed.
         chain.doFilter(request, response);
-    }
-
-    private boolean isPublicEndpoint(String path, String method) {
-        return path.equals("/api/users/register") ||
-               path.equals("/api/users/login") ||
-               (path.startsWith("/api/services") && method.equals("GET")) ||
-               (path.startsWith("/api/search") && method.equals("GET")) ||
-               (path.matches("/api/users/[^/]+/profile") && method.equals("GET"));
     }
 }

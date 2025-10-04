@@ -35,6 +35,8 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
     http
         .csrf(csrf -> csrf.disable())
         .authorizeHttpRequests(auth -> auth
+            // Add this line to permit all WebSocket connection requests
+            .requestMatchers("/ws/**").permitAll() 
             .requestMatchers("/api/users/register", "/api/users/login").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/services", "/api/services/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/users/*/profile").permitAll()
