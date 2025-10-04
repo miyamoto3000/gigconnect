@@ -47,7 +47,7 @@
 
         function connectAndSubscribe() {
             const userId = document.getElementById('userId').value;
-            const jwtToken = document.getElementById('jwtToken').value; // Get token from new input
+            const jwtToken = document.getElementById('jwtToken').value;
             if (!userId || !jwtToken) {
                 log("Error: Please enter your User ID and JWT Token.");
                 return;
@@ -60,16 +60,15 @@
             const socket = new SockJS('http://localhost:8081/ws');
             stompClient = Stomp.over(socket);
 
-            // Define the connection headers, including the Authorization token
             const headers = {
                 'Authorization': 'Bearer ' + jwtToken
             };
 
-            stompClient.connect(headers, function (frame) { // Pass headers to connect method
+            stompClient.connect(headers, function (frame) {
                 log('Successfully connected as user ' + userId);
 
                 // Subscribe to private chat messages
-                const privateQueue = '/user/queue/messages';
+                const privateQueue = '/user/' + userId + '/queue/messages';
                 log('Subscribing to private chat queue: ' + privateQueue);
                 stompClient.subscribe(privateQueue, function (message) {
                     const chatMessage = JSON.parse(message.body);
@@ -112,7 +111,7 @@
 
             stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
             log(`Sent message to ${recipientId}: ${content}`);
-            document.getElementById('messageContent').value = ''; // Clear message input
+            document.getElementById('messageContent').value = '';
         }
 
         function disconnect() {
