@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GigConnect WebSocket Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+    <h1>GigConnect WebSocket Real-Time Notification Tester</h1>
+    <p>Open your browser's developer console (F12) to see connection status and incoming notifications.</p>
+    <hr>
+    <div>
+        <label for="userId">Enter User ID to Listen For:</label>
+        <input type="text" id="userId" placeholder="Paste the User ID here...">
+        <button onclick="connectAndSubscribe()">Connect & Subscribe</button>
+        <button onclick="disconnect()">Disconnect</button>
+    </div>
+    <hr>
+    <h2>Log:</h2>
+    <div id="logs"></div>
+
+    <script>
+        let stompClient = null;
+        const logs = document.getElementById('logs');
+
+        function log(message) {
+            console.log(message);
+            const p = document.createElement('p');
+            p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logs.appendChild(p);
+        }
+
+        function connectAndSubscribe() {
+            const userId = document.getElementById('userId').value;
+            if (!userId) {
+                log("Error: Please enter a User ID to subscribe to.");
+                return;
+            }
+
+            if (stompClient !== null) {
+                log("Already connected. Please disconnect first.");
+                return;
+            }
+
+            // 1. Create a SockJS connection to your server's endpoint
+            const socket = new SockJS('http://localhost:8081/ws');
+
+            // 2. Create a STOMP client over that connection
+            stompClient = Stomp.over(socket);
+
+            // 3. Connect!
+            stompClient.connect({}, function (frame) {
+                log('Successfully connected to WebSocket server: ' + frame);
+
+                // 4. Subscribe to the user-specific notification topic
+                const subscriptionUrl = '/topic/notifications/' + userId;
+                log('Subscribing to: ' + subscriptionUrl);
+                
+                stompClient.subscribe(subscriptionUrl, function (notification) {
+                    const notificationBody = JSON.parse(notification.body);
+                    log('Received Notification: ' + notificationBody.content);
+                });
+
+            }, function(error) {
+                log('Connection Error: ' + error);
+                stompClient = null; // Reset client on error
+            });
+        }
+
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect(function() {
+                    log("Disconnected.");
+                    stompClient = null;
+                });
+            } else {
+                log("Not connected.");
+            }
+        }
+    </script>
+</body>
+</html>
