@@ -6,7 +6,7 @@ import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
 
-public interface GigServiceRepository extends MongoRepository<GigService, String> {
+public interface GigServiceRepository extends MongoRepository<GigService, String>, GigServiceRepositoryCustom {
     List<GigService> findByUserId(String userId);
 
     @Query("{ $or: [ { 'title': { $regex: ?0, $options: 'i' } }, { 'category': { $regex: ?0, $options: 'i' } } ] }")

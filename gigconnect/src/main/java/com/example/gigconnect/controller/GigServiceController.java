@@ -90,20 +90,21 @@ public class GigServiceController {
         }
     }
 
-    @GetMapping("/search")
-    public ResponseEntity<List<PublicUserProfileDTO>> searchServices(
-            @RequestParam String keyword,
-            @RequestParam(required = false) String city,
-            @RequestParam(required = false) String state,
-            @RequestParam(required = false) List<String> skills,
-            Authentication authentication) {
-        logger.debug("Searching services with keyword: {}, city: {}, state: {}", keyword, city, state);
-        try {
-            List<PublicUserProfileDTO> profiles = userService.searchGigWorkers(keyword, city, state);
-            return ResponseEntity.ok(profiles);
-        } catch (RuntimeException e) {
-            logger.error("Failed to search services: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+@GetMapping("/search")
+public ResponseEntity<List<PublicUserProfileDTO>> searchServices(
+        @RequestParam String keyword,
+        @RequestParam(required = false) String city,
+        @RequestParam(required = false) String state,
+        @RequestParam(required = false) List<String> skills,
+        Authentication authentication) {
+    logger.debug("Searching services with keyword: {}, city: {}, state: {}, skills: {}", keyword, city, state,
+            skills);
+    try {
+        List<PublicUserProfileDTO> profiles = userService.searchGigWorkers(keyword, city, state, skills);
+        return ResponseEntity.ok(profiles);
+    } catch (RuntimeException e) {
+        logger.error("Failed to search services: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
     }
+}
 }

@@ -160,27 +160,17 @@ public User getUserByEmail(String email) {
     }
     return user;
 } 
-public List<PublicUserProfileDTO> searchGigWorkers(String keyword, String city, String state) {
-    logger.debug("Searching gig workers with keyword: {}, city: {}, state: {}", keyword, city, state);
+public List<PublicUserProfileDTO> searchGigWorkers(String keyword, String city, String state, List<String> skills) {
+    logger.debug("Searching gig workers with keyword: {}, city: {}, state: {}, skills: {}", keyword, city, state,
+            skills);
 
-    // Use the new repository method to efficiently find users by location.
-    // Pass empty strings if city or state are null to match all.
-    List<User> gigWorkers = userRepository.findGigWorkersByLocation(
-            city != null ? city : "",
-            state != null ? state : ""
-    );
+    List<User> gigWorkers = gigServiceRepository.searchGigWorkers(keyword, city, state, skills);
 
-    List<String> gigWorkerIds = gigWorkers.stream().map(User::getId).collect(Collectors.toList());
-
-    // Find services matching the keyword for these gig workers
-    List<GigService> matchingServices = gigServiceRepository.findByUserIdsAndTitleOrCategory(gigWorkerIds, keyword);
-
-    // Get unique gig worker IDs from matching services
-    Set<String> matchingGigWorkerIds = matchingServices.stream()
-            .map(GigService::getUserId)
+    // Get unique gig worker IDs from the results
+    Set<String> matchingGigWorkerIds = gigWorkers.stream()
+            .map(User::getId)
             .collect(Collectors.toSet());
 
-    // Convert to PublicUserProfileDTO
     List<PublicUserProfileDTO> profiles = matchingGigWorkerIds.stream()
             .map(this::getPublicProfile)
             .collect(Collectors.toList());
