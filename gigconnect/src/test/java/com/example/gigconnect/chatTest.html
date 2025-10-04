@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GigConnect WebSocket Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+    <h1>GigConnect Real-Time Chat & Notification Tester</h1>
+    <p>Open your browser's developer console (F12) to see connection status and incoming messages.</p>
+    <hr>
+    <div>
+        <label for="userId">Your User ID:</label>
+        <input type="text" id="userId" placeholder="Paste your User ID here...">
+    </div>
+    <div>
+        <label for="jwtToken">Your JWT Token:</label>
+        <input type="text" id="jwtToken" placeholder="Paste your JWT Token here..." style="width: 400px;">
+    </div>
+    <button onclick="connectAndSubscribe()">Connect & Subscribe</button>
+    <button onclick="disconnect()">Disconnect</button>
+    <hr>
+    <div>
+        <h3>Send a Message</h3>
+        <label for="recipientId">Recipient User ID:</label>
+        <input type="text" id="recipientId" placeholder="Paste recipient's User ID...">
+        <br>
+        <label for="messageContent">Message:</label>
+        <input type="text" id="messageContent" placeholder="Type your message...">
+        <br>
+        <button onclick="sendMessage()">Send Message</button>
+    </div>
+    <hr>
+    <h2>Log:</h2>
+    <div id="logs"></div>
+
+    <script>
+        let stompClient = null;
+        const logs = document.getElementById('logs');
+
+        function log(message) {
+            console.log(message);
+            const p = document.createElement('p');
+            p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logs.appendChild(p);
+        }
+
+        function connectAndSubscribe() {
+            const userId = document.getElementById('userId').value;
+            const jwtToken = document.getElementById('jwtToken').value; // Get token from new input
+            if (!userId || !jwtToken) {
+                log("Error: Please enter your User ID and JWT Token.");
+                return;
+            }
+            if (stompClient !== null) {
+                log("Already connected. Please disconnect first.");
+                return;
+            }
+
+            const socket = new SockJS('http://localhost:8081/ws');
+            stompClient = Stomp.over(socket);
+
+            // Define the connection headers, including the Authorization token
+            const headers = {
+                'Authorization': 'Bearer ' + jwtToken
+            };
+
+            stompClient.connect(headers, function (frame) { // Pass headers to connect method
+                log('Successfully connected as user ' + userId);
+
+                // Subscribe to private chat messages
+                const privateQueue = '/user/queue/messages';
+                log('Subscribing to private chat queue: ' + privateQueue);
+                stompClient.subscribe(privateQueue, function (message) {
+                    const chatMessage = JSON.parse(message.body);
+                    log(`Received private message from ${chatMessage.senderId}: ${chatMessage.content}`);
+                });
+
+                // Subscribe to public notifications
+                const notificationTopic = '/topic/notifications/' + userId;
+                log('Subscribing to notifications: ' + notificationTopic);
+                stompClient.subscribe(notificationTopic, function (notification) {
+                    const notificationBody = JSON.parse(notification.body);
+                    log('Received Notification: ' + notificationBody.content);
+                });
+
+            }, function(error) {
+                log('Connection Error: ' + error);
+                stompClient = null;
+            });
+        }
+
+        function sendMessage() {
+            if (stompClient === null || !stompClient.connected) {
+                log("Error: Not connected. Please connect first.");
+                return;
+            }
+            const senderId = document.getElementById('userId').value;
+            const recipientId = document.getElementById('recipientId').value;
+            const content = document.getElementById('messageContent').value;
+
+            if (!senderId || !recipientId || !content) {
+                log("Error: Please fill in Your ID, Recipient ID, and a message.");
+                return;
+            }
+
+            const chatMessage = {
+                senderId: senderId,
+                recipientId: recipientId,
+                content: content
+            };
+
+            stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
+            log(`Sent message to ${recipientId}: ${content}`);
+            document.getElementById('messageContent').value = ''; // Clear message input
+        }
+
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect(function() {
+                    log("Disconnected.");
+                    stompClient = null;
+                });
+            } else {
+                log("Not connected.");
+            }
+        }
+    </script>
+</body>
+</html>
