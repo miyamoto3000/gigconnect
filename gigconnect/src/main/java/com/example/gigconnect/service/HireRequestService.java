@@ -9,7 +9,8 @@ import com.example.gigconnect.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Service; 
+import com.example.gigconnect.model.Notification;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -29,7 +30,10 @@ public class HireRequestService {
     private GigServiceRepository gigServiceRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserRepository userRepository; 
+
+    @Autowired
+    private NotificationService notificationService;
 
     public HireRequest createHireRequest(HireRequest hireRequest, String clientEmail) {
         logger.debug("Creating hire request for client email: {}", clientEmail);
@@ -82,40 +86,55 @@ public class HireRequestService {
         hireRequest.setGigWorkerId(gigWorker.getId());
         hireRequest.setStatus("PENDING");
         hireRequest.setCreatedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-        HireRequest savedRequest = hireRequestRepository.save(hireRequest);
+        HireRequest savedRequest = hireRequestRepository.save(hireRequest); 
+
+        // --- NEW NOTIFICATION LOGIC ---
+        // After saving the request, send a notification to the gig worker
+        String notificationContent = "You have a new hire request from " + client.getName() + " for your service: '" + service.getTitle() + "'";
+        Notification notification = new Notification(notificationContent, gigWorker.getId());
+        notificationService.sendNotification(notification); 
+        // --- END NOTIFICATION LOGIC ---
         logger.debug("Hire request created: {}", savedRequest);
         return savedRequest;
     }
 
-    public HireRequest acceptHireRequest(String hireRequestId, String gigWorkerEmail) {
+  public HireRequest acceptHireRequest(String hireRequestId, String gigWorkerEmail) {
         logger.debug("Accepting hire request {} by gig worker email: {}", hireRequestId, gigWorkerEmail);
         HireRequest hireRequest = hireRequestRepository.findById(hireRequestId)
-                .orElseThrow(() -> {
-                    logger.error("Hire request not found: {}", hireRequestId);
-                    return new RuntimeException("Hire request not found");
-                });
+                .orElseThrow(() -> new RuntimeException("Hire request not found"));
 
         User gigWorker = userRepository.findByEmail(gigWorkerEmail);
         if (gigWorker == null || !gigWorker.getRole().equals("GIG_WORKER")) {
-            logger.error("User not found or not a GIG_WORKER: {}", gigWorkerEmail);
             throw new RuntimeException("Only GIG_WORKERs can accept hire requests");
         }
 
         if (!hireRequest.getGigWorkerId().equals(gigWorker.getId())) {
-            logger.error("Gig Worker not authorized to accept this hire request: {}", gigWorkerEmail);
             throw new RuntimeException("Not authorized to accept this hire request");
         }
 
         if (!hireRequest.getStatus().equals("PENDING")) {
-            logger.error("Hire request is not in PENDING state: {}", hireRequest.getStatus());
             throw new RuntimeException("Hire request is not in PENDING state");
         }
 
         hireRequest.setStatus("ACCEPTED");
-        hireRequest.setWorkStatus("IN_PROGRESS"); // Initialize work status
+        hireRequest.setWorkStatus("IN_PROGRESS");
         HireRequest updatedRequest = hireRequestRepository.save(hireRequest);
         logger.debug("Hire request accepted: {}", updatedRequest);
+
+        // --- NEW NOTIFICATION LOGIC ---
+        // Notify the client that their request was accepted
+        String notificationContent = "Your hire request for service '" + getServiceName(hireRequest.getServiceId()) + "' has been accepted by " + gigWorker.getName() + "!";
+        Notification notification = new Notification(notificationContent, hireRequest.getClientId());
+        notificationService.sendNotification(notification);
+        // --- END OF NEW LOGIC ---
+
         return updatedRequest;
+    } 
+     // Add this helper method to the end of your HireRequestService class
+    private String getServiceName(String serviceId) {
+        return gigServiceRepository.findById(serviceId)
+                .map(GigService::getTitle)
+                .orElse("a deleted service");
     }
 
     public HireRequest rejectHireRequest(String hireRequestId, String gigWorkerEmail) {
@@ -144,7 +163,13 @@ public class HireRequestService {
 
         hireRequest.setStatus("REJECTED");
         HireRequest updatedRequest = hireRequestRepository.save(hireRequest);
-        logger.debug("Hire request rejected: {}", updatedRequest);
+        logger.debug("Hire request rejected: {}", updatedRequest); 
+         // --- NEW NOTIFICATION LOGIC ---
+        // Notify the client that their request was rejected
+        String notificationContent = "Unfortunately, your hire request for service '" + getServiceName(hireRequest.getServiceId()) + "' has been rejected.";
+        Notification notification = new Notification(notificationContent, hireRequest.getClientId());
+        notificationService.sendNotification(notification);
+        // --- END OF NEW LOGIC ---
         return updatedRequest;
     }
 
@@ -225,7 +250,14 @@ public class HireRequestService {
 
         hireRequest.setStatus("COMPLETED");
         HireRequest updatedRequest = hireRequestRepository.save(hireRequest);
-        logger.debug("Hire request completed: {}", updatedRequest);
+        logger.debug("Hire request completed: {}", updatedRequest); 
+        // --- NEW NOTIFICATION LOGIC ---
+        // Notify the client that the work has been completed
+        String notificationContent = "The work for your hire request '" + getServiceName(hireRequest.getServiceId()) + "' has been marked as complete by " + gigWorker.getName() + ".";
+        Notification notification = new Notification(notificationContent, hireRequest.getClientId());
+        notificationService.sendNotification(notification);
+        // --- END OF NEW LOGIC ---
+
         return updatedRequest;
     }
 
