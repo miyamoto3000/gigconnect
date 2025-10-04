@@ -17,7 +17,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
-import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer; 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -42,29 +44,46 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.setUserDestinationPrefix("/user");
     }
 
-    @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(new ChannelInterceptor() {
-            @Override
-            public Message<?> preSend(Message<?> message, MessageChannel channel) {
-                StompHeaderAccessor accessor =
-                        MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+// In WebSocketConfig.java
+private static final Logger logger = LoggerFactory.getLogger(WebSocketConfig.class);
 
-                if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+@Override
+public void configureClientInboundChannel(ChannelRegistration registration) {
+    registration.interceptors(new ChannelInterceptor() {
+        @Override
+        public Message<?> preSend(Message<?> message, MessageChannel channel) {
+            StompHeaderAccessor accessor =
+                    MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+
+            if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+                try {
                     String authorizationHeader = accessor.getFirstNativeHeader("Authorization");
-                    if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
-                        String jwt = authorizationHeader.substring(7);
-                        String email = jwtUtil.getEmailFromToken(jwt);
-                        if (email != null) {
-                            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                            UsernamePasswordAuthenticationToken authentication =
-                                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                            accessor.setUser(authentication);
-                        }
+                    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+                        logger.error("STOMP connection failed: Missing or invalid Authorization header.");
+                        // Returning null rejects the message and closes the connection
+                        return null; 
                     }
+
+                    String jwt = authorizationHeader.substring(7);
+                    String email = jwtUtil.getEmailFromToken(jwt);
+
+                    if (email != null && jwtUtil.validateToken(jwt)) {
+                        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                        accessor.setUser(authentication);
+                        logger.debug("STOMP connection SUCCESS for user: {}", email);
+                    } else {
+                        logger.error("STOMP connection failed: Invalid JWT token.");
+                        return null; // Reject connection
+                    }
+                } catch (Exception e) {
+                    logger.error("STOMP connection authentication FAILED: {}", e.getMessage());
+                    return null; // Reject connection
                 }
-                return message;
             }
-        });
-    }
+            return message;
+        }
+    });
+}
 }
