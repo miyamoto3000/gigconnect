@@ -1,10 +1,18 @@
-// Create new file: src/main/java/com/example/gigconnect/service/PaymentService.java
+// File: src/main/java/com/example/gigconnect/service/PaymentService.java
 package com.example.gigconnect.service;
 
-import com.example.gigconnect.controller.PaymentVerificationRequest;
-import com.example.gigconnect.model.*;
-import com.example.gigconnect.repository.*;
-import com.razorpay.*;
+import com.example.gigconnect.dto.PaymentVerificationRequest; // CORRECT IMPORT
+import com.example.gigconnect.model.HireRequest;
+import com.example.gigconnect.model.Notification;
+import com.example.gigconnect.model.Payment; // CORRECT IMPORT FOR YOUR MODEL
+import com.example.gigconnect.model.User;
+import com.example.gigconnect.repository.HireRequestRepository;
+import com.example.gigconnect.repository.PaymentRepository;
+import com.example.gigconnect.repository.UserRepository;
+import com.razorpay.Order;
+import com.razorpay.RazorpayClient;
+import com.razorpay.RazorpayException;
+import com.razorpay.Utils;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,7 +93,7 @@ public class PaymentService {
                 hireRequest.setWorkStatus("IN_PROGRESS");
                 hireRequestRepository.save(hireRequest);
 
-                Payment payment = new Payment();
+                Payment payment = new Payment(); // This now correctly refers to your model
                 payment.setHireRequestId(hireRequest.getId());
                 payment.setRazorpayPaymentId(request.getRazorpay_payment_id());
                 payment.setRazorpayOrderId(orderId);

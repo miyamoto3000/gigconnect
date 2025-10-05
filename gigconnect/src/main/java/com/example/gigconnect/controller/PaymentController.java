@@ -1,9 +1,10 @@
-// Create new file: src/main/java/com/example/gigconnect/controller/PaymentController.java
+// File: src/main/java/com/example/gigconnect/controller/PaymentController.java
 package com.example.gigconnect.controller;
 
+import com.example.gigconnect.dto.ApiResponse;
+import com.example.gigconnect.dto.OrderRequest;
+import com.example.gigconnect.dto.PaymentVerificationRequest;
 import com.example.gigconnect.service.PaymentService;
-import lombok.Data;
-import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -29,31 +30,4 @@ public class PaymentController {
         paymentService.verifyPaymentAndUpdateStatus(verificationRequest);
         return ResponseEntity.ok(new ApiResponse("Payment verified successfully."));
     }
-}
-
-// DTO Classes
-@Data
-class OrderRequest {
-    private String hireRequestId;
-}
-
-@Data
-class PaymentVerificationRequest {
-    private String razorpay_payment_id;
-    private String razorpay_order_id;
-    private String razorpay_signature;
-    
-    public JSONObject getProperties() {
-        JSONObject options = new JSONObject();
-        options.put("razorpay_order_id", this.razorpay_order_id);
-        options.put("razorpay_payment_id", this.razorpay_payment_id);
-        options.put("razorpay_signature", this.razorpay_signature);
-        return options;
-    }
-}
-
-@Data
-class ApiResponse {
-    private String message;
-    public ApiResponse(String message) { this.message = message; }
 }
