@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GigConnect Full Workflow Simulator (Corrected)</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 20px auto; padding: 20px; }
+        .section { border: 1px solid #ccc; border-radius: 8px; padding: 20px; margin-bottom: 20px; background-color: #f9f9f9; }
+        h1, h2 { border-bottom: 2px solid #3399cc; padding-bottom: 10px; color: #3399cc; }
+        input, button { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ccc; }
+        button { background-color: #3399cc; color: white; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #287ba3; }
+        .log-container { background-color: #2d2d2d; color: #f1f1f1; padding: 15px; border-radius: 5px; margin-top: 20px; font-family: monospace; font-size: 14px; white-space: pre-wrap; height: 300px; overflow-y: scroll; }
+        .status { padding: 5px; border-radius: 4px; color: white; display: inline-block; margin-left: 10px; }
+        .status.ok { background-color: #28a745; }
+        .status.pending { background-color: #ffc107; color: black; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>GigConnect Full Workflow Simulator (Corrected)</h1>
+
+    <div class="section">
+        <h2>Step 1: User Management</h2>
+        <input type="email" id="clientEmail" placeholder="Client Email" value="client-final@example.com">
+        <input type="password" id="clientPassword" placeholder="Client Password" value="password123">
+        <button onclick="registerAndLogin('client')">Register & Login Client</button>
+        <span id="clientStatus" class="status pending">Not Logged In</span>
+        <hr>
+        <input type="email" id="workerEmail" placeholder="Gig Worker Email" value="worker-final@example.com">
+        <input type="password" id="workerPassword" placeholder="Gig Worker Password" value="password123">
+        <button onclick="registerAndLogin('worker')">Register & Login Gig Worker</button>
+        <span id="workerStatus" class="status pending">Not Logged In</span>
+    </div>
+
+    <div id="serviceSection" class="section hidden">
+        <h2>Step 2: Create a Gig Service (as Gig Worker)</h2>
+        <input type="text" id="serviceTitle" placeholder="Service Title" value="Professional API Testing">
+        <input type="number" id="serviceBudget" placeholder="Budget (e.g., 2500)" value="2500">
+        <button onclick="createService()">Create Service</button>
+    </div>
+    <div id="hireSection" class="section hidden">
+        <h2>Step 3: Create Hire Request (as Client)</h2>
+        <button onclick="createHireRequest()">Hire Worker</button>
+    </div>
+    <div id="acceptSection" class="section hidden">
+        <h2>Step 4: Accept Hire Request (as Gig Worker)</h2>
+        <button onclick="acceptHireRequest()">Accept Request</button>
+    </div>
+    <div id="paymentSection" class="section hidden">
+        <h2>Step 5: Make Payment (as Client)</h2>
+        <button onclick="startPaymentProcess()">Proceed to Pay</button>
+    </div>
+
+    <div class="log-container" id="logs">Logs will appear here...</div>
+
+    <script>
+        const logs = document.getElementById('logs');
+        const BASE_URL = 'http://localhost:8081';
+
+        function log(message, isError = false) {
+            const prefix = isError ? '❌ Error:' : '✅';
+            logs.innerHTML = `[${new Date().toLocaleTimeString()}] ${prefix} ${message}\n` + logs.innerHTML;
+        }
+        
+        async function apiCall(endpoint, method, body = null, token = null) {
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                
+                const response = await fetch(`${BASE_URL}${endpoint}`, { method, headers, body: body ? JSON.stringify(body) : null });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorMessage = `HTTP ${response.status} on ${method} ${endpoint}: ${errorText}`;
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = `HTTP ${response.status}: ${errorData.error || JSON.stringify(errorData)}`;
+                    } catch (e) {}
+                    throw new Error(errorMessage);
+                }
+                
+                const contentType = response.headers.get("content-type");
+                return contentType?.includes("application/json") ? await response.json() : await response.text();
+            } catch (error) {
+                log(error.message, true);
+                throw error;
+            }
+        }
+
+        async function registerAndLogin(userType) {
+            const email = document.getElementById(`${userType}Email`).value;
+            const password = document.getElementById(`${userType}Password`).value;
+            try {
+                // THIS IS THE FIX: Ensure the role is "GIG_WORKER" for the worker
+                const role = userType === 'worker' ? 'GIG_WORKER' : 'CLIENT';
+                
+                const registerBody = { name: `${userType} Test User`, email, password, role };
+                await apiCall('/api/users/register', 'POST', registerBody);
+                log(`Registered ${userType} with role '${role}'`);
+
+                const token = await apiCall('/api/users/login', 'POST', { email, password });
+                localStorage.setItem(`${userType}Token`, token);
+                log(`${userType} logged in successfully.`);
+                
+                const statusEl = document.getElementById(`${userType}Status`);
+                statusEl.textContent = 'Logged In';
+                statusEl.className = 'status ok';
+                
+                if (localStorage.getItem('clientToken') && localStorage.getItem('workerToken')) {
+                    document.getElementById('serviceSection').classList.remove('hidden');
+                }
+            } catch (error) {}
+        }
+        
+        // --- The rest of the functions are the same as before ---
+
+        async function createService() {
+            try {
+                const title = document.getElementById('serviceTitle').value;
+                const budget = parseFloat(document.getElementById('serviceBudget').value);
+                const workerToken = localStorage.getItem('workerToken');
+                const service = await apiCall('/api/services', 'POST', {
+                    title, description: "Service created via simulator", price: budget, category: "Simulation"
+                }, workerToken);
+                localStorage.setItem('serviceId', service.id);
+                log(`Service '${title}' created with ID: ${service.id}`);
+                document.getElementById('hireSection').classList.remove('hidden');
+            } catch (error) {}
+        }
+        
+        async function createHireRequest() {
+            try {
+                const clientToken = localStorage.getItem('clientToken');
+                const serviceId = localStorage.getItem('serviceId');
+                const hireRequest = await apiCall('/api/hire-requests', 'POST', {
+                    serviceId, message: "Hiring via simulator", requestedDateTime: "2025-10-20T15:00:00",
+                    budget: parseFloat(document.getElementById('serviceBudget').value)
+                }, clientToken);
+                localStorage.setItem('hireRequestId', hireRequest.id);
+                log(`Hire request sent with ID: ${hireRequest.id}`);
+                document.getElementById('acceptSection').classList.remove('hidden');
+            } catch (error) {}
+        }
+
+        async function acceptHireRequest() {
+            try {
+                const workerToken = localStorage.getItem('workerToken');
+                const hireRequestId = localStorage.getItem('hireRequestId');
+                await apiCall(`/api/hire-requests/${hireRequestId}/accept`, 'POST', null, workerToken);
+                log(`Hire request ${hireRequestId} accepted.`);
+                document.getElementById('paymentSection').classList.remove('hidden');
+            } catch (error) {}
+        }
+
+        async function startPaymentProcess() {
+            try {
+                const clientToken = localStorage.getItem('clientToken');
+                const hireRequestId = localStorage.getItem('hireRequestId');
+                const client = await apiCall('/api/users/me', 'GET', null, clientToken);
+                log(`Fetched details for: ${client.name}`);
+                const orderDetails = await apiCall('/api/payments/create-order', 'POST', { hireRequestId }, clientToken);
+                log(`Razorpay Order created: ${orderDetails.orderId}`);
+                const options = {
+                    key: orderDetails.keyId,
+                    amount: parseFloat(document.getElementById('serviceBudget').value) * 100,
+                    currency: "INR",
+                    name: "GigConnect Simulation",
+                    description: `Payment for Hire ID: ${hireRequestId}`,
+                    order_id: orderDetails.orderId,
+                    handler: async function (response) {
+                        log(`Payment successful on Razorpay. Payment ID: ${response.razorpay_payment_id}`);
+                        log("Verifying payment with server...");
+                        const verificationResult = await apiCall('/api/payments/verify-payment', 'POST', {
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_signature: response.razorpay_signature
+                        });
+                        log(`SERVER RESPONSE: ${verificationResult.message}`);
+                        log("🎉🎉🎉 FULL FLOW COMPLETED SUCCESSFULLY! 🎉🎉🎉");
+                    },
+                    prefill: { name: client.name, email: client.email },
+                    theme: { color: "#3399cc" }
+                };
+                const rzp = new Razorpay(options);
+                rzp.on('payment.failed', (response) => log(`Payment Failed: ${response.error.description}`, true));
+                rzp.open();
+            } catch (error) {}
+        }
+    </script>
+</body>
+</html>

@@ -30,20 +30,22 @@ public class SecurityConfig {
     }
 
    // SecurityConfig.java
+// In SecurityConfig.java
+
 @Bean
 public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http
+        .cors(cors -> {}) // Enable CORS integration with Spring Security
         .csrf(csrf -> csrf.disable())
         .authorizeHttpRequests(auth -> auth
-            // Add this line to permit all WebSocket connection requests
+            // THIS IS THE FIX: Allow all OPTIONS preflight requests
+            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .requestMatchers("/ws/**").permitAll() 
             .requestMatchers("/api/users/register", "/api/users/login").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/services", "/api/services/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/users/*/profile").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/services/search").permitAll()
-            .requestMatchers("/api/hire-requests/**").authenticated()
-            .requestMatchers("/api/reviews/**").authenticated()
-            .requestMatchers("/api/users/profile").authenticated()
+            .requestMatchers("/api/payments/verify-payment").permitAll() // Make verification public
             .anyRequest().authenticated()
         )
         .exceptionHandling(ex -> ex
