@@ -22,7 +22,10 @@ public class HireRequest {
     private String createdAt;
     private String requestedDateTime;
     @Positive(message = "Budget must be positive")
-    private double budget;
+    private double budget; 
+     private String paymentStatus; // Will hold values like "PENDING", "PAID", "FAILED"
+    private String clientConfirmationStatus; // Will hold "PENDING", "CONFIRMED", "DISPUTED"
+    private String razorpayOrderId; // To link this request with a Razorpay ord
 
     @Override
     public String toString() {

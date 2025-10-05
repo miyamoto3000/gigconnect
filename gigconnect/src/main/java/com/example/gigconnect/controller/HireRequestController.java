@@ -18,7 +18,8 @@ import java.util.List;
 public class HireRequestController {
 
     private static final Logger logger = LoggerFactory.getLogger(HireRequestController.class);
-
+    
+    
     @Autowired
     private HireRequestService hireRequestService;
 
@@ -164,6 +165,17 @@ public class HireRequestController {
 
         public void setWorkStatus(String workStatus) {
             this.workStatus = workStatus;
+        }
+    } 
+     @PostMapping("/{id}/confirm-completion")
+    public ResponseEntity<HireRequest> confirmCompletion(@PathVariable String id, Authentication authentication) {
+        logger.debug("Received request to confirm completion for hire request {} by user: {}", id, authentication.getName());
+        try {
+            HireRequest updatedRequest = hireRequestService.confirmCompletion(id, authentication.getName());
+            return ResponseEntity.ok(updatedRequest);
+        } catch (RuntimeException e) {
+            logger.error("Failed to confirm hire request completion: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
     }
 }

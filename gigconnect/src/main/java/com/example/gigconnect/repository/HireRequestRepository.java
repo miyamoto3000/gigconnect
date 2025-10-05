@@ -4,10 +4,12 @@ import com.example.gigconnect.model.HireRequest;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface HireRequestRepository extends MongoRepository<HireRequest, String> {
     List<HireRequest> findByGigWorkerId(String gigWorkerId);
     List<HireRequest> findByClientId(String clientId);
     List<HireRequest> findByGigWorkerIdAndStatus(String gigWorkerId, String status);
-    List<HireRequest> findByServiceId(String serviceId); // Add this method
+    List<HireRequest> findByServiceId(String serviceId); // Add this method 
+    Optional<HireRequest> findByRazorpayOrderId(String razorpayOrderId);
 }
