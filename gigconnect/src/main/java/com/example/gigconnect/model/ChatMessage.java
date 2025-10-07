@@ -12,6 +12,7 @@ public class ChatMessage {
     private String id;
     private String senderId;
     private String recipientId;
-    private String content;
+    private String content; 
+    private String mediaUrl;
     private LocalDateTime timestamp;
 }

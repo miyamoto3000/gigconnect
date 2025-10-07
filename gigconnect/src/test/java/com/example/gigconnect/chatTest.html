@@ -4,6 +4,20 @@
     <title>GigConnect WebSocket Test</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        #chat-window {
+            height: 300px;
+            border: 1px solid #ccc;
+            overflow-y: scroll;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        #chat-window img {
+            max-width: 200px;
+            max-height: 200px;
+            display: block;
+        }
+    </style>
 </head>
 <body>
     <h1>GigConnect Real-Time Chat & Notification Tester</h1>
@@ -20,6 +34,7 @@
     <button onclick="connectAndSubscribe()">Connect & Subscribe</button>
     <button onclick="disconnect()">Disconnect</button>
     <hr>
+    <div id="chat-window"></div>
     <div>
         <h3>Send a Message</h3>
         <label for="recipientId">Recipient User ID:</label>
@@ -27,8 +42,11 @@
         <br>
         <label for="messageContent">Message:</label>
         <input type="text" id="messageContent" placeholder="Type your message...">
+        <button onclick="sendMessage()">Send Text</button>
         <br>
-        <button onclick="sendMessage()">Send Message</button>
+        <label for="file-upload">Share Media:</label>
+        <input type="file" id="file-upload" accept="image/*,video/*">
+        <button onclick="sendFile()">Send File</button>
     </div>
     <hr>
     <h2>Log:</h2>
@@ -37,12 +55,27 @@
     <script>
         let stompClient = null;
         const logs = document.getElementById('logs');
+        const chatWindow = document.getElementById('chat-window');
 
         function log(message) {
             console.log(message);
             const p = document.createElement('p');
             p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
             logs.appendChild(p);
+        }
+
+        function displayMessage(message) {
+            const p = document.createElement('p');
+            if (message.content) {
+                p.textContent = `From ${message.senderId}: ${message.content}`;
+            } else if (message.mediaUrl) {
+                const img = document.createElement('img');
+                img.src = message.mediaUrl;
+                p.textContent = `From ${message.senderId}: `;
+                p.appendChild(img);
+            }
+            chatWindow.appendChild(p);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
         }
 
         function connectAndSubscribe() {
@@ -66,16 +99,13 @@
 
             stompClient.connect(headers, function (frame) {
                 log('Successfully connected as user ' + userId);
-
-                // Subscribe to private chat messages
                 const privateQueue = '/user/' + userId + '/queue/messages';
                 log('Subscribing to private chat queue: ' + privateQueue);
                 stompClient.subscribe(privateQueue, function (message) {
                     const chatMessage = JSON.parse(message.body);
-                    log(`Received private message from ${chatMessage.senderId}: ${chatMessage.content}`);
+                    displayMessage(chatMessage);
                 });
 
-                // Subscribe to public notifications
                 const notificationTopic = '/topic/notifications/' + userId;
                 log('Subscribing to notifications: ' + notificationTopic);
                 stompClient.subscribe(notificationTopic, function (notification) {
@@ -87,6 +117,57 @@
                 log('Connection Error: ' + error);
                 stompClient = null;
             });
+        }
+
+        async function sendFile() {
+            if (stompClient === null || !stompClient.connected) {
+                log("Error: Not connected. Please connect first.");
+                return;
+            }
+            const fileInput = document.getElementById('file-upload');
+            const file = fileInput.files[0];
+            const recipientId = document.getElementById('recipientId').value;
+            const jwtToken = document.getElementById('jwtToken').value;
+
+            if (!file || !recipientId) {
+                log("Error: Please select a file and enter a recipient.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                log("Uploading file to server...");
+                const response = await fetch('http://localhost:8081/api/files/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + jwtToken
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`File upload failed with status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                const mediaUrl = result.secure_url;
+                log(`File uploaded successfully. URL: ${mediaUrl}`);
+
+                const chatMessage = {
+                    senderId: document.getElementById('userId').value,
+                    recipientId: recipientId,
+                    mediaUrl: mediaUrl
+                };
+
+                stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
+                displayMessage(chatMessage);
+                log(`Sent media message to ${recipientId}`);
+                fileInput.value = '';
+            } catch (error) {
+                log(`Error: ${error.message}`);
+            }
         }
 
         function sendMessage() {
@@ -110,6 +191,7 @@
             };
 
             stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
+            displayMessage(chatMessage);
             log(`Sent message to ${recipientId}: ${content}`);
             document.getElementById('messageContent').value = '';
         }
