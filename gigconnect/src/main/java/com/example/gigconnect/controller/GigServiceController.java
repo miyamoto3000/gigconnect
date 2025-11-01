@@ -106,5 +106,40 @@ public ResponseEntity<List<PublicUserProfileDTO>> searchServices(
         logger.error("Failed to search services: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
     }
+} 
+
+// --- ADD THIS ENTIRE NEW ENDPOINT ---
+@GetMapping("/search-semantic")
+public ResponseEntity<List<PublicUserProfileDTO>> searchServicesSemantic(
+        @RequestParam String keyword,
+        @RequestParam(required = false) String city,
+        @RequestParam(required = false) String state,
+        @RequestParam(required = false) List<String> skills) {
+
+    logger.debug("Semantic search request received: {}", keyword);
+    try {
+        List<PublicUserProfileDTO> profiles = userService.searchGigWorkersSemantic(keyword, city, state, skills);
+        return ResponseEntity.ok(profiles);
+    } catch (RuntimeException e) {
+        logger.error("Failed to semantic search services: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+    }
+} 
+// TEMPORARY ADMIN ENDPOINT
+@GetMapping("/admin/backfill-vectors")
+public ResponseEntity<String> backfillVectors() {
+    logger.info("Starting vector backfill...");
+    List<GigService> allServices = gigServiceService.getAllServices();
+    int count = 0;
+    for (GigService service : allServices) {
+        if (service.getServiceVector() == null) {
+            // Call the service method (which now has the logic)
+            gigServiceService.updateService(service.getId(), service, "admin-backfill");
+            count++;
+        }
+    }
+    String message = "Backfill complete. Updated " + count + " services.";
+    logger.info(message);
+    return ResponseEntity.ok(message);
 }
 }

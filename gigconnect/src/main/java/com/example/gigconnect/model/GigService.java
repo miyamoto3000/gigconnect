@@ -4,7 +4,8 @@ import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Positive; 
+import java.util.List;
 
 @Data
 @Document(collection = "services")
@@ -19,5 +20,6 @@ public class GigService {
     private double price;
     @NotBlank(message = "Category is required")
     private String category;
-    private String userId; // Links to GIG_WORKER, set by the service layer
+    private String userId; // Links to GIG_WORKER, set by the service layer 
+    private List<Double> serviceVector;
 }

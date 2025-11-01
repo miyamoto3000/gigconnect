@@ -18,8 +18,11 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -42,7 +45,11 @@ public class UserService {
     private JwtUtil jwtUtil;
 
     @Autowired
-    private AuthenticationManager authenticationManager;
+    private AuthenticationManager authenticationManager; 
+
+    @Autowired
+private RestTemplate restTemplate; // <-- ADD THIS
+private final String vectorizerUrl = "http://localhost:5001/vectorize";
 
     public User registerUser(@Valid User user) {
         logger.debug("Registering user with email: {}", user.getEmail());
@@ -177,5 +184,46 @@ public List<PublicUserProfileDTO> searchGigWorkers(String keyword, String city, 
 
     logger.debug("Found {} gig workers matching search criteria", profiles.size());
     return profiles;
+} 
+
+// --- ADD THIS ENTIRE NEW METHOD ---
+public List<PublicUserProfileDTO> searchGigWorkersSemantic(String keyword, String city, String state, List<String> skills) {
+    logger.debug("Semantic searching for: {}", keyword);
+
+    // 1. Get the query vector
+    List<Double> queryVector = getVectorForText(keyword);
+    if (queryVector == null) {
+        logger.warn("Could not generate vector for keyword: {}", keyword);
+        return new ArrayList<>(); // Return empty if vectorizing fails
+    }
+
+    // 2. Call the NEW repository method
+    List<User> gigWorkers = gigServiceRepository.searchGigWorkersByVector(queryVector, city, state, skills);
+
+    // 3. Your existing DTO conversion logic
+    Set<String> matchingGigWorkerIds = gigWorkers.stream()
+            .map(User::getId)
+            .collect(Collectors.toSet());
+
+    List<PublicUserProfileDTO> profiles = matchingGigWorkerIds.stream()
+            .map(this::getPublicProfile)
+            .collect(Collectors.toList());
+
+    logger.debug("Found {} gig workers matching semantic search", profiles.size());
+    return profiles;
+}
+
+// --- ADD THIS HELPER METHOD ---
+private List<Double> getVectorForText(String text) {
+    try {
+        Map<String, String> requestBody = Map.of("text", text);
+        Map<String, Object> response = restTemplate.postForObject(vectorizerUrl, requestBody, Map.class);
+        if (response != null && response.containsKey("vector")) {
+            return (List<Double>) response.get("vector");
+        }
+    } catch (Exception e) {
+        logger.error("Failed to generate vector for text: " + text, e);
+    }
+    return null;
 }
 }
