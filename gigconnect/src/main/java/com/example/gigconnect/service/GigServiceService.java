@@ -98,5 +98,33 @@ public List<GigService> getMyServices(String email) {
         throw new RuntimeException("Only GIG_WORKERs can view their services");
     }
     return gigServiceRepository.findByUserId(user.getId());
-}
+}  
+
+// Inside /src/main/java/com/example/gigconnect/service/GigServiceService.java
+//
+
+    public String backfillServiceVectors() {
+        logger.info("Starting vector backfill...");
+        List<GigService> allServices = gigServiceRepository.findAll();
+        int count = 0;
+        for (GigService service : allServices) {
+            // Check if vector is missing
+            if (service.getServiceVector() == null || service.getServiceVector().isEmpty()) {
+                try {
+                    // Call the same helper method you already built
+                    List<Double> vector = getVectorForService(service.getTitle(), service.getDescription());
+                    service.setServiceVector(vector);
+                    
+                    // Save directly to the repository, bypassing auth checks
+                    gigServiceRepository.save(service); 
+                    count++;
+                } catch (Exception e) {
+                    logger.error("Failed to backfill vector for service: " + service.getId(), e);
+                }
+            }
+        }
+        String message = "Backfill complete. Updated " + count + " services.";
+        logger.info(message);
+        return message;
+    }
 }

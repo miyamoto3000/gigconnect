@@ -1,5 +1,6 @@
 package com.example.gigconnect.repository;
 
+import com.example.gigconnect.model.GigService;
 import com.example.gigconnect.model.User;
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,5 +54,31 @@ public class GigServiceRepositoryVectorImpl implements GigServiceRepositoryVecto
 
         Aggregation aggregation = Aggregation.newAggregation(operations);
         return mongoTemplate.aggregate(aggregation, "services", User.class).getMappedResults();
+    } 
+
+    // --- ADD THIS ENTIRE NEW METHOD ---
+    @Override
+    public List<GigService> findSimilarServices(List<Double> queryVector, String excludeServiceId) {
+        List<AggregationOperation> operations = new ArrayList<>();
+
+        // 1. Find the N most similar services using vector search
+        Document vectorSearchStage = new Document("$vectorSearch",
+            new Document("index", "default") // The name of your Atlas index
+                .append("path", "serviceVector")
+                .append("queryVector", queryVector)
+                .append("numCandidates", 100) // Check 100 candidates
+                .append("limit", 15)         // Return top 15 similar
+        );
+        operations.add(context -> vectorSearchStage);
+
+        // 2. Exclude the service we're already looking at
+        operations.add(Aggregation.match(
+            Criteria.where("_id").ne(excludeServiceId)
+        ));
+
+        Aggregation aggregation = Aggregation.newAggregation(operations);
+        
+        // Return the raw GigService objects
+        return mongoTemplate.aggregate(aggregation, "services", GigService.class).getMappedResults();
     }
 }

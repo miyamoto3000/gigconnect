@@ -2,6 +2,7 @@ package com.example.gigconnect.controller;
 
 import com.example.gigconnect.dto.PublicUserProfileDTO;
 import com.example.gigconnect.model.GigService;
+import com.example.gigconnect.model.User;
 import com.example.gigconnect.service.GigServiceService;
 import com.example.gigconnect.service.UserService;
 import jakarta.validation.Valid;
@@ -126,20 +127,30 @@ public ResponseEntity<List<PublicUserProfileDTO>> searchServicesSemantic(
     }
 } 
 // TEMPORARY ADMIN ENDPOINT
-@GetMapping("/admin/backfill-vectors")
-public ResponseEntity<String> backfillVectors() {
-    logger.info("Starting vector backfill...");
-    List<GigService> allServices = gigServiceService.getAllServices();
-    int count = 0;
-    for (GigService service : allServices) {
-        if (service.getServiceVector() == null) {
-            // Call the service method (which now has the logic)
-            gigServiceService.updateService(service.getId(), service, "admin-backfill");
-            count++;
+@PostMapping("/admin/backfill-vectors") // Use POST for an action that changes data
+public ResponseEntity<String> backfillVectors(Authentication authentication) {
+    // Get the currently logged-in user
+    User user = userService.getUserByEmail(authentication.getName());
+    
+    // Check if they are an ADMIN (your User model supports this role)
+    if (!user.getRole().equals("ADMIN")) {
+        logger.warn("User {} tried to run backfill without ADMIN role", user.getEmail());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Not authorized");
+    }
+    
+    // Run the new, correct backfill method
+    String message = gigServiceService.backfillServiceVectors();
+    return ResponseEntity.ok(message);
+} 
+@GetMapping("/{serviceId}/recommendations")
+    public ResponseEntity<List<PublicUserProfileDTO>> getRecommendations(
+            @PathVariable String serviceId) {
+        try {
+            List<PublicUserProfileDTO> recommendations = userService.getRecommendedWorkers(serviceId);
+            return ResponseEntity.ok(recommendations);
+        } catch (RuntimeException e) {
+            logger.error("Failed to get recommendations for service {}: {}", serviceId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
-    String message = "Backfill complete. Updated " + count + " services.";
-    logger.info(message);
-    return ResponseEntity.ok(message);
-}
 }

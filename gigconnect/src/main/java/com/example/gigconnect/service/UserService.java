@@ -21,6 +21,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -225,5 +227,50 @@ private List<Double> getVectorForText(String text) {
         logger.error("Failed to generate vector for text: " + text, e);
     }
     return null;
-}
+} 
+public List<PublicUserProfileDTO> getRecommendedWorkers(String targetServiceId) {
+        // 1. Find the service the client is looking at
+        GigService targetService = gigServiceRepository.findById(targetServiceId)
+                .orElseThrow(() -> new RuntimeException("Target service not found: " + targetServiceId));
+
+        // 2. Get its vector
+        List<Double> targetVector = targetService.getServiceVector();
+        if (targetVector == null || targetVector.isEmpty()) {
+            logger.warn("Target service {} has no vector. Cannot find recommendations.", targetServiceId);
+            return new ArrayList<>(); // Can't recommend if we have no vector
+        }
+
+        // 3. Find semantically similar services
+        List<GigService> similarServices = gigServiceRepository.findSimilarServices(targetVector, targetServiceId);
+        
+        // 4. Get the unique workers from these services
+        Set<String> workerIdsToExclude = new HashSet<>();
+        // Exclude the worker who owns the target service
+        workerIdsToExclude.add(targetService.getUserId()); 
+
+        List<PublicUserProfileDTO> recommendations = new ArrayList<>();
+        
+        for (GigService service : similarServices) {
+            String workerId = service.getUserId();
+            
+            // If we haven't already added this worker, get their profile
+            if (!workerIdsToExclude.contains(workerId)) {
+                try {
+                    // REUSE your existing getPublicProfile method!
+                    PublicUserProfileDTO profile = getPublicProfile(workerId);
+                    if (profile != null) {
+                         recommendations.add(profile);
+                    }
+                    workerIdsToExclude.add(workerId); // Add to set so we don't add them again
+                } catch (Exception e) {
+                    logger.error("Error fetching public profile for recommended worker {}: {}", workerId, e.getMessage());
+                }
+            }
+        }
+        
+        // 5. Sort the list: show highest-rated workers first
+        recommendations.sort(Comparator.comparing(PublicUserProfileDTO::getAverageRating).reversed());
+
+        return recommendations;
+    }
 }
